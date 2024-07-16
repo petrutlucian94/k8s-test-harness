@@ -1,0 +1,7 @@
+*.rock
+**/__pycache__
+.pytest_cache
+.venv
+.tox
+build/
+*.egg-info/
