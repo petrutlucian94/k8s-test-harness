@@ -20,4 +20,4 @@ where = ["."]
 namespaces = false
 
 [tool.setuptools.package-data]
-k8s_test_harness = ["*.yaml"]
+k8s_test_harness = ["*.yaml", "templates/*.yaml"]
