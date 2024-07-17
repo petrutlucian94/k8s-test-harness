@@ -1,0 +1,23 @@
+[project]
+name = "k8s_test_harness"
+version = "0.0.1"
+authors = []
+description = "Kubernetes testing harness"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements-test.txt"]}
+
+[tool.setuptools.packages.find]
+include = ["k8s_test_harness*"]
+where = ["."]
+namespaces = false
+
+[tool.setuptools.package-data]
+k8s_test_harness = ["*.yaml"]
