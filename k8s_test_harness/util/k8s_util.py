@@ -185,6 +185,7 @@ def get_helm_install_command(
     images: List[HelmImage] = None,
     runAsUser: int = 584792,
     set_configs: List[str] = None,
+    chart_version: str = None,
 ):
     """Creates a helm install command for the given helm chart.
 
@@ -216,14 +217,15 @@ def get_helm_install_command(
             repository,
         ]
 
+    if chart_version:
+        helm_command += [
+            "--version",
+            chart_version,
+        ]
+
     for image in images:
         image_split = image.uri.split(":")
         image_name = image_split[0]
-
-        # This helm charts requires setting the image registry separately.
-        parts = image_name.split("/")
-        if len(parts) > 1:
-            image_name = "/".join(parts[1:])
 
         prefix = ""
         if image.prefix:
