@@ -21,6 +21,10 @@ class LocalHarness(Harness):
 
     name = "local"
 
+    # The local harness cannot perform instance cleanup since there is no form
+    # of sandboxing.
+    supports_cleanup = False
+
     def __init__(self):
         super(LocalHarness, self).__init__()
         self.initialized = False

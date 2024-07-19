@@ -43,6 +43,9 @@ class Harness:
 
     name: str
 
+    # Some harnesses cannot effectively cleanup instances (e.g. LocalHarness)
+    supports_cleanup = True
+
     def new_instance(self) -> Instance:
         """Creates a new instance on the infrastructure and returns an object
         which can be used to interact with it.
