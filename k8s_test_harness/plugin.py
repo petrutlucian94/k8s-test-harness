@@ -26,7 +26,7 @@ def _harness_clean(h: harness.Harness):
         h.cleanup()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def h() -> harness.Harness:
     LOG.debug("Create harness for %s", config.SUBSTRATE)
     if config.SUBSTRATE == "local":
@@ -47,19 +47,14 @@ def h() -> harness.Harness:
     _harness_clean(h)
 
 
-@pytest.fixture(scope="module")
-def module_instance(
-    h: harness.Harness, tmp_path_factory: pytest.TempPathFactory, request
-) -> Generator[harness.Instance, None, None]:
+def _get_instance(h: harness.Harness, request):
     """Constructs and bootstraps an instance that persists over a test session.
 
     Bootstraps the instance with all k8sd features enabled to reduce testing time.
     """
     LOG.info("Setup node and enable all features")
-
     instance = h.new_instance()
     k8s_util.setup_k8s_snap(instance)
-    request.addfinalizer(lambda: k8s_util.purge_k8s_snap(instance))
 
     bootstrap_config_path = "/home/ubuntu/bootstrap-session.yaml"
     instance.send_file(
@@ -71,5 +66,37 @@ def module_instance(
     k8s_util.wait_until_k8s_ready(instance, [instance])
     k8s_util.wait_for_network(instance)
     k8s_util.wait_for_dns(instance)
+
+    return instance
+
+
+@pytest.fixture(scope="module")
+def module_instance(
+    h: harness.Harness, tmp_path_factory: pytest.TempPathFactory, request
+) -> Generator[harness.Instance, None, None]:
+    instance = _get_instance(h, request)
+
+    if config.SKIP_CLEANUP:
+        LOG.warning("Skipping instance cleanup.")
+    else:
+        request.addfinalizer(lambda: h.delete_instance(instance.id))
+        if not h.supports_cleanup:
+            request.addfinalizer(lambda: k8s_util.purge_k8s_snap(instance))
+
+    yield instance
+
+
+@pytest.fixture(scope="function")
+def function_instance(
+    h: harness.Harness, tmp_path_factory: pytest.TempPathFactory, request
+) -> Generator[harness.Instance, None, None]:
+    instance = _get_instance(h, request)
+
+    if config.SKIP_CLEANUP:
+        LOG.warning("Skipping instance cleanup.")
+    else:
+        request.addfinalizer(lambda: h.delete_instance(instance.id))
+        if not h.supports_cleanup:
+            request.addfinalizer(lambda: k8s_util.purge_k8s_snap(instance))
 
     yield instance
