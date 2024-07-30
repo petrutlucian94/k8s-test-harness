@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details
 #
 
+import functools
 import itertools
 import json
 import logging
@@ -30,6 +31,27 @@ def setup_k8s_snap(instance: harness.Instance):
 def purge_k8s_snap(instance: harness.Instance):
     LOG.info("Purge k8s snap")
     instance.exec(["sudo", "snap", "remove", "k8s", "--purge"])
+
+
+def describe_resources_on_error(resource_type: str):
+    def _decorator(fun):
+        @functools.wraps(fun)
+        def _inner(instance: harness.Instance, *args, **kwargs):
+            try:
+                return fun(instance, *args, **kwargs)
+            except Exception:
+                proc = instance.exec(
+                    ["k8s", "kubectl", "describe", resource_type], capture_output=True
+                )
+                LOG.info(
+                    f"### All current '{resource_type}' definitions: "
+                    f"{proc.stdout.decode()}"
+                )
+                raise
+
+        return _inner
+
+    return _decorator
 
 
 # Validates that the K8s node is in Ready state.
@@ -129,9 +151,11 @@ def wait_for_resource(
     name: str,
     namespace: str = constants.K8S_NS_DEFAULT,
     condition: str = constants.K8S_CONDITION_AVAILABLE,
+    retry_times: int = 5,
+    retry_delay_s: int = 60,
 ):
     """Waits for the given resource to reach the given condition."""
-    exec_util.stubbornly(retries=5, delay_s=1).on(instance).exec(
+    exec_util.stubbornly(retries=retry_times, delay_s=retry_delay_s).on(instance).exec(
         [
             "k8s",
             "kubectl",
@@ -142,26 +166,44 @@ def wait_for_resource(
             resource_type,
             name,
             "--timeout",
-            "60s",
+            "1s",
         ]
     )
 
 
+@describe_resources_on_error("pods")
+@describe_resources_on_error("deployment")
 def wait_for_deployment(
     instance: harness.Instance,
     name: str,
     namespace: str = constants.K8S_NS_DEFAULT,
     condition: str = constants.K8S_CONDITION_AVAILABLE,
+    retry_times: int = 5,
+    retry_delay_s: int = 60,
 ):
     """Waits for the given deployment to reach the given condition."""
-    wait_for_resource(instance, constants.K8S_DEPLOYMENT, name, namespace, condition)
+    wait_for_resource(
+        instance,
+        constants.K8S_DEPLOYMENT,
+        name,
+        namespace=namespace,
+        condition=condition,
+        retry_times=retry_times,
+        retry_delay_s=retry_delay_s,
+    )
 
 
+@describe_resources_on_error("pods")
+@describe_resources_on_error("daemonsets")
 def wait_for_daemonset(
-    instance: harness.Instance, name: str, namespace: str = constants.K8S_NS_DEFAULT
+    instance: harness.Instance,
+    name: str,
+    namespace: str = constants.K8S_NS_DEFAULT,
+    retry_times: int = 5,
+    retry_delay_s: int = 60,
 ):
     """Waits for the given daemonset to become available."""
-    exec_util.stubbornly(retries=5, delay_s=1).on(instance).exec(
+    exec_util.stubbornly(retries=retry_times, delay_s=retry_delay_s).on(instance).exec(
         [
             "k8s",
             "kubectl",
@@ -172,7 +214,33 @@ def wait_for_daemonset(
             constants.K8S_DAEMONSET,
             name,
             "--timeout",
-            "60s",
+            "1s",
+        ]
+    )
+
+
+@describe_resources_on_error("pods")
+@describe_resources_on_error("statefulsets")
+def wait_for_statefulset(
+    instance: harness.Instance,
+    name: str,
+    namespace: str = constants.K8S_NS_DEFAULT,
+    retry_times: int = 5,
+    retry_delay_s: int = 60,
+):
+    """Waits for the given daemonset to become available."""
+    exec_util.stubbornly(retries=retry_times, delay_s=retry_delay_s).on(instance).exec(
+        [
+            "k8s",
+            "kubectl",
+            "rollout",
+            "status",
+            "--namespace",
+            namespace,
+            constants.K8S_STATEFULSET,
+            name,
+            "--timeout",
+            "1s",
         ]
     )
 
